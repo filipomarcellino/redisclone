@@ -34,7 +34,7 @@ func main() {
 			return
 		}
 		// parse resp format to string format
-		operation := readResp(string(buffer))
+		// operation := readResp(string(buffer))
 		// res := execute(operation)
 		// resRESP := toRESP(res)
 

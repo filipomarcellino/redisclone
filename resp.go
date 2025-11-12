@@ -8,9 +8,7 @@ import (
 	"strings"
 )
 
-func readResp(bufferStr string) string {
-	reader := bufio.NewReader(strings.NewReader(bufferStr))
-
+func readResp(reader *bufio.Reader) []string {
 	// read first byte to get type of data
 	dataType, _ := reader.ReadByte()
 	switch string(dataType) {
@@ -20,24 +18,44 @@ func readResp(bufferStr string) string {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		strings.TrimSuffix(val, "\r")
-		return val
+		trimmed := strings.TrimSuffix(val, "\r\n")
+		return []string{trimmed}
 	case "$":
-		// read second byte to get the length of bulk string
-		size, _ := reader.ReadByte()
-		strSize, _ := strconv.ParseInt(string(size), 10, 64)
-		buffer := make([]byte, strSize)
+		// read the size of string
+		sizeStr, _ := reader.ReadString('\n')
+		trimmed := strings.TrimSuffix(sizeStr, "\r\n")
+		size, err := strconv.Atoi(trimmed)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// add 2 bytes to consume \r\n at the end of the string
+		buffer := make([]byte, size + 2)
 		reader.Read(buffer)
-		return string(buffer)
+		return []string {string(buffer[: size])}
 	case "*":
-		fmt.Println("Array")
+		sizeStr, _ := reader.ReadString('\n')
+		trimmed := strings.TrimSuffix(sizeStr, "\r\n")
+		size, err := strconv.Atoi(trimmed)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		var slice []string = make([]string, 0, size)
+		
+		for i := 0; i < size; i++ {
+			slice = append(slice, readResp(reader)...)
+		}
+		return slice
+
 	// case ":":
 	// 	fmt.Println("Integer")
 	// case "-":
 	// 	fmt.Println("Error")
 	default:
-		return ""
+		return nil
 
 	}
-	return ""
+	return nil
 }

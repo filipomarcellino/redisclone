@@ -33,7 +33,12 @@ func main() {
 			fmt.Println("error reading from client: ", err.Error())
 			return
 		}
-		readRESP(string(buffer))
+		// parse resp format to string format
+		operation := readResp(string(buffer))
+		// res := execute(operation)
+		// resRESP := toRESP(res)
+
+		// 
 		conn.Write([]byte("+OK\r\n"))
 	}
 }

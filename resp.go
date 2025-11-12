@@ -3,29 +3,41 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 )
 
-func readRESP(bufferStr string) {
-	// read first byte to know what comes next
+func readResp(bufferStr string) string {
 	reader := bufio.NewReader(strings.NewReader(bufferStr))
 
-	b, _ := reader.ReadByte()
-	fmt.Println(string(b))
-	switch string(b) {
+	// read first byte to get type of data
+	dataType, _ := reader.ReadByte()
+	switch string(dataType) {
 	case "+":
-		readSimpleString()
+		val, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		strings.TrimSuffix(val, "\r")
+		return val
 	case "$":
-		fmt.Println("Bulk string")
-	case ":":
-		fmt.Println("Integer")
+		// read second byte to get the length of bulk string
+		size, _ := reader.ReadByte()
+		strSize, _ := strconv.ParseInt(string(size), 10, 64)
+		buffer := make([]byte, strSize)
+		reader.Read(buffer)
+		return string(buffer)
 	case "*":
 		fmt.Println("Array")
-	case "-":
-		fmt.Println("Error")
-	}
-}
+	// case ":":
+	// 	fmt.Println("Integer")
+	// case "-":
+	// 	fmt.Println("Error")
+	default:
+		return ""
 
-func readSimpleString() {
-	
+	}
+	return ""
 }

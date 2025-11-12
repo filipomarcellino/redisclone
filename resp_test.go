@@ -6,6 +6,6 @@ import (
 
 func TestReadRESP(t *testing.T) {
 	input := "$5\r\nAhmed\r\n"
-	readRESP(input)
+	read(input)
 
 }

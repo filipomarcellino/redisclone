@@ -23,9 +23,8 @@ func main() {
 	defer conn.Close()
 	for {
 		// kilobyte-size buffer to read messages from client
-		buffer := make([]byte, 1024)
-
-		_, err = conn.Read(buffer)
+		parser := newRespParser(conn)
+		_, err = parser.readResp()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -38,7 +37,7 @@ func main() {
 		// res := execute(operation)
 		// resRESP := toRESP(res)
 
-		// 
+		//
 		conn.Write([]byte("+OK\r\n"))
 	}
 }

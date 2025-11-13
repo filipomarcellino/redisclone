@@ -3,59 +3,90 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"os"
+	"io"
 	"strconv"
 	"strings"
 )
 
-func readResp(reader *bufio.Reader) []string {
+type ParsedType struct {
+	typ   string
+	str   string
+	num   int
+	bulk  string
+	array []ParsedType
+}
+
+type RespParser struct {
+	reader *bufio.Reader
+}
+
+func newRespParser(r io.Reader) *RespParser {
+	return &RespParser{reader: bufio.NewReader(r)}
+}
+
+// helper function to read the next integer
+func (p *RespParser) readInt() (int, error) {
+	sizeStr, _ := p.reader.ReadString('\n')
+	trimmed := strings.TrimSuffix(sizeStr, "\r\n")
+	size, err := strconv.Atoi(trimmed)
+	if err != nil {
+		fmt.Println(err)
+		return 0, err
+	}
+	return size, nil
+}
+
+func (p *RespParser) readResp() (ParsedType, error) {
 	// read first byte to get type of data
-	dataType, _ := reader.ReadByte()
+	dataType, _ := p.reader.ReadByte()
 	switch string(dataType) {
 	case "+":
-		val, err := reader.ReadString('\n')
+		val, err := p.reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
-			os.Exit(1)
+			return ParsedType{}, err
 		}
 		trimmed := strings.TrimSuffix(val, "\r\n")
-		return []string{trimmed}
+		return ParsedType{
+			typ: "string",
+			str: trimmed,
+		}, nil
 	case "$":
 		// read the size of string
-		sizeStr, _ := reader.ReadString('\n')
-		trimmed := strings.TrimSuffix(sizeStr, "\r\n")
-		size, err := strconv.Atoi(trimmed)
+		size, err := p.readInt()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return ParsedType{}, err
 		}
-
 		// add 2 bytes to consume \r\n at the end of the string
-		buffer := make([]byte, size + 2)
-		reader.Read(buffer)
-		return []string {string(buffer[: size])}
+		buffer := make([]byte, size+2)
+		p.reader.Read(buffer)
+		return ParsedType{
+			typ: "bulk",
+			str: string(buffer[:size]),
+		}, nil
 	case "*":
-		sizeStr, _ := reader.ReadString('\n')
-		trimmed := strings.TrimSuffix(sizeStr, "\r\n")
-		size, err := strconv.Atoi(trimmed)
+		// read array size
+		var parsed ParsedType = ParsedType{}
+		parsed.typ = "array"
+		size, err := p.readInt()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return ParsedType{}, err
 		}
-		var slice []string = make([]string, 0, size)
-		
+		parsed.array = make([]ParsedType, 0, size)
 		for i := 0; i < size; i++ {
-			slice = append(slice, readResp(reader)...)
+			temp, err := p.readResp()
+			if err != nil {
+				return ParsedType{}, err
+			}
+			parsed.array = append(parsed.array, temp)
 		}
-		return slice
+		return parsed, nil
 
-	// case ":":
-	// 	fmt.Println("Integer")
-	// case "-":
-	// 	fmt.Println("Error")
-	default:
-		return nil
-
+		// case ":":
+		// 	fmt.Println("Integer")
+		// case "-":
+		// 	fmt.Println("Error")
 	}
-	return nil
+	fmt.Println("Unknown type")
+	return ParsedType{}, nil
 }

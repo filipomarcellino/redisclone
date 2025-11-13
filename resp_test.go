@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,14 +8,17 @@ import (
 
 func TestSimpleString(t *testing.T) {
 	inputSimpleString := "+OK\r\n"
-	fmt.Println(readResp(bufio.NewReader(strings.NewReader(inputSimpleString))))
+	parser := newRespParser(strings.NewReader(inputSimpleString))
+	fmt.Println(parser.readResp())
 }
 
 func TestBulkString(t *testing.T) {
 	inputBulkString := "$5\r\nAhmed\r\n"
-	fmt.Println(readResp(bufio.NewReader(strings.NewReader(inputBulkString))))
+	parser := newRespParser(strings.NewReader(inputBulkString))
+	fmt.Println(parser.readResp())
 }
 func TestArray(t *testing.T) {
 	inputArray := "*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n"
-	fmt.Println(readResp(bufio.NewReader(strings.NewReader(inputArray))))
+	parser := newRespParser(strings.NewReader(inputArray))
+	fmt.Println(parser.readResp())
 }

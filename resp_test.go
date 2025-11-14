@@ -57,7 +57,6 @@ func TestBulkString(t *testing.T) {
 	inputBulkString := "$5\r\nAhmed\r\n"
 	parser := newRespParser(strings.NewReader(inputBulkString))
 	result, err := parser.readResp()
-
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -225,7 +224,7 @@ func TestReadIntInvalid(t *testing.T) {
 // Tests for ParsedType Marshal methods
 
 func TestMarshalString(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "string",
 		str: "OK",
 	}
@@ -238,7 +237,7 @@ func TestMarshalString(t *testing.T) {
 }
 
 func TestMarshalStringEmpty(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "string",
 		str: "",
 	}
@@ -251,7 +250,7 @@ func TestMarshalStringEmpty(t *testing.T) {
 }
 
 func TestMarshalStringWithSpaces(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "string",
 		str: "Hello World",
 	}
@@ -264,7 +263,7 @@ func TestMarshalStringWithSpaces(t *testing.T) {
 }
 
 func TestMarshalBulk(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ:  "bulk",
 		bulk: "hello",
 	}
@@ -277,7 +276,7 @@ func TestMarshalBulk(t *testing.T) {
 }
 
 func TestMarshalBulkEmpty(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ:  "bulk",
 		bulk: "",
 	}
@@ -290,7 +289,7 @@ func TestMarshalBulkEmpty(t *testing.T) {
 }
 
 func TestMarshallError(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "error",
 		str: "ERR unknown command",
 	}
@@ -303,7 +302,7 @@ func TestMarshallError(t *testing.T) {
 }
 
 func TestMarshallErrorEmpty(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "error",
 		str: "",
 	}
@@ -316,7 +315,7 @@ func TestMarshallErrorEmpty(t *testing.T) {
 }
 
 func TestMarshallNull(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "null",
 	}
 	result := pt.marshallNull()
@@ -328,9 +327,9 @@ func TestMarshallNull(t *testing.T) {
 }
 
 func TestMarshalArray(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "array",
-		array: []ParsedType{
+		array: []Value{
 			{typ: "string", str: "hello"},
 			{typ: "string", str: "world"},
 		},
@@ -344,9 +343,9 @@ func TestMarshalArray(t *testing.T) {
 }
 
 func TestMarshalArrayEmpty(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ:   "array",
-		array: []ParsedType{},
+		array: []Value{},
 	}
 	result := pt.MarshalArray()
 	expected := []byte("*0\r\n")
@@ -357,7 +356,7 @@ func TestMarshalArrayEmpty(t *testing.T) {
 }
 
 func TestMarshalDefault(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "unknown",
 	}
 	result := pt.Marshal()
@@ -369,7 +368,7 @@ func TestMarshalDefault(t *testing.T) {
 }
 
 func TestMarshalNull(t *testing.T) {
-	pt := ParsedType{
+	pt := Value{
 		typ: "null",
 	}
 	result := pt.Marshal()

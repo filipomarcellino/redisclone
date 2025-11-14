@@ -14,12 +14,20 @@ func main() {
 		return
 	}
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// create unique key value instance
+	kv := NewKV()
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		go handleConnetion(conn, kv)
 
+	}
+}
+
+func handleConnetion(conn net.Conn, kv *KV) {
 	defer conn.Close()
 	parser := newRespParser(conn)
 	for {
@@ -33,7 +41,9 @@ func main() {
 			break
 		}
 		fmt.Printf("%+v\n", val)
-		respBytes := val.Marshal()
+		executor := NewExecutor(kv)
+		responseVal := executor.handleCommand(val)
+		respBytes := responseVal.Marshal()
 		_, err = conn.Write(respBytes)
 		if err != nil {
 			fmt.Println("error writing to client: ", err.Error())

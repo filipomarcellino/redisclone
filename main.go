@@ -21,23 +21,23 @@ func main() {
 	}
 
 	defer conn.Close()
+	parser := newRespParser(conn)
 	for {
 		// kilobyte-size buffer to read messages from client
-		parser := newRespParser(conn)
-		_, err = parser.readResp()
+		val, err := parser.readResp()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			fmt.Println("error reading from client: ", err.Error())
-			return
+			break
 		}
-		// parse resp format to string format
-		// operation := readResp(string(buffer))
-		// res := execute(operation)
-		// resRESP := toRESP(res)
-
-		//
-		conn.Write([]byte("+OK\r\n"))
+		fmt.Printf("%+v\n", val)
+		respBytes := val.Marshal()
+		_, err = conn.Write(respBytes)
+		if err != nil {
+			fmt.Println("error writing to client: ", err.Error())
+			break
+		}
 	}
 }

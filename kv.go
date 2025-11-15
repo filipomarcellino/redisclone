@@ -7,8 +7,8 @@ type KV struct {
 	lock  sync.RWMutex
 }
 
-func NewKV() *KV{
-	return &KV{}
+func NewKV() *KV {
+	return &KV{store: make(map[string]any)}
 }
 
 func (kv *KV) get(key string) (any, bool) {

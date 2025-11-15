@@ -39,5 +39,5 @@ func (e *Executor) handleGetCommand(array []Value) Value {
 	if !ok {
 		return Value{typ: "null"}
 	}
-	return Value{typ: "bulk", str: valString}
+	return Value{typ: "bulk", bulk: valString}
 }

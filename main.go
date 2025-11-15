@@ -40,9 +40,10 @@ func handleConnetion(conn net.Conn, kv *KV) {
 			fmt.Println("error reading from client: ", err.Error())
 			break
 		}
-		fmt.Printf("%+v\n", val)
+		fmt.Printf("request: %+v\n", val)
 		executor := NewExecutor(kv)
 		responseVal := executor.handleCommand(val)
+		fmt.Printf("response: %+v\n", responseVal)
 		respBytes := responseVal.Marshal()
 		_, err = conn.Write(respBytes)
 		if err != nil {

@@ -20,6 +20,10 @@ func (e *Executor) handleCommand(input Value) Value {
 		return e.handleSetCommand(input.array[1:])
 	case "GET":
 		return e.handleGetCommand(input.array[1:])
+	case "COMMAND":
+		// redis-cli asks for "COMMAND DOCS" or just "COMMAND" on startup for smart auto-completion
+		// we'll stub this implementation for now
+		return Value{typ: "array", array: []Value{}}
 	default:
 		return Value{}
 	}

@@ -10,6 +10,11 @@ type Executor struct {
 	db *KV
 }
 
+type KeyValuePair struct {
+	key   string
+	value string
+}
+
 func NewExecutor(db *KV) *Executor {
 	return &Executor{db: db}
 }
@@ -33,6 +38,10 @@ func (e *Executor) handleCommand(input Value) Value {
 		return e.handleSetCommand(input.array[1:])
 	case "GET":
 		return e.handleGetCommand(input.array[1:])
+	case "MSET":
+		return e.handleMsetCommand(input.array[1:])
+	case "MGET":
+		return e.handleMgetCommand(input.array[1:])
 	case "COMMAND":
 		// redis-cli asks for "COMMAND DOCS" or just "COMMAND" on startup for smart auto-completion
 		// we'll stub this implementation for now by returning an empty array
@@ -57,11 +66,30 @@ func (e *Executor) handleGetCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'get' command"}
 	}
 	key := array[0].bulk
-	val, ok := e.db.get(key)
-	if !ok {
-		return Value{typ: "null"}
+	return e.db.get(key)
+}
+
+func (e *Executor) handleMsetCommand(array []Value) Value {
+	if len(array) < 2 || len(array)%2 == 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'mset' command"}
 	}
-	return Value{typ: "bulk", bulk: val}
+	var pairs []KeyValuePair = make([]KeyValuePair, 0, len(array)/2)
+	for i := 0; i < len(array); i += 2 {
+		pairs = append(pairs, KeyValuePair{key: array[0].bulk, value: array[1].bulk})
+	}
+	e.db.mset(pairs)
+	return Value{typ: "string", str: "OK"}
+}
+
+func (e *Executor) handleMgetCommand(array []Value) Value {
+	if len(array) < 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'mget' command"}
+	}
+	var keys []string = make([]string, 0, len(array))
+	for _, value := range array {
+		keys = append(keys, value.bulk)
+	}
+	return e.db.mget(keys)
 }
 
 func (e *Executor) handlePingCommand(array []Value) Value {
@@ -79,28 +107,44 @@ func (e *Executor) handleIncrCommand(array []Value) Value {
 	if len(array) != 1 {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'INCR' command"}
 	}
-	// check if value is an int
 	key := array[0].bulk
-	val, _ := e.db.get(key)
-	valInt, err := strconv.Atoi(val)
+	val := e.db.get(key)
+
+	// new key
+	if val.typ == "null" {
+		e.db.set(key, "1")
+		return Value{typ: "integer", num: 1}
+	}
+
+	// check if value is an integer
+	valInt, err := strconv.Atoi(val.bulk)
 	if err != nil {
 		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
 	}
+
 	e.db.set(key, strconv.Itoa(valInt+1))
 	return Value{typ: "integer", num: valInt + 1}
 }
 
 func (e *Executor) handleDecrCommand(array []Value) Value {
 	if len(array) != 1 {
-		return Value{typ: "error", str: "ERR wrong number of arguments for 'DECR' command"}
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'INCR' command"}
 	}
-	// check if value is an int
 	key := array[0].bulk
-	val, _ := e.db.get(key)
-	valInt, err := strconv.Atoi(val)
+	val := e.db.get(key)
+
+	// new key
+	if val.typ == "null" {
+		e.db.set(key, "1")
+		return Value{typ: "integer", num: 1}
+	}
+
+	// check if value is an integer
+	valInt, err := strconv.Atoi(val.bulk)
 	if err != nil {
 		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
 	}
+
 	e.db.set(key, strconv.Itoa(valInt-1))
 	return Value{typ: "integer", num: valInt - 1}
 }

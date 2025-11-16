@@ -13,6 +13,7 @@ const (
 	BULK   byte = '$'
 	ARRAY  byte = '*'
 	ERROR  byte = '-'
+	INT    byte = ':'
 )
 
 type Value struct {
@@ -35,6 +36,8 @@ func (v Value) Marshal() []byte {
 		return v.MarshalBulk()
 	case "string":
 		return v.MarshalString()
+	case "integer":
+		return v.MarshalInt()
 	case "null":
 		return v.marshallNull()
 	case "error":
@@ -48,6 +51,14 @@ func (v Value) MarshalString() []byte {
 	buffer := []byte{}
 	buffer = append(buffer, STRING)
 	buffer = append(buffer, v.str...)
+	buffer = append(buffer, '\r', '\n')
+	return buffer
+}
+
+func (v Value) MarshalInt() []byte {
+	buffer := []byte{}
+	buffer = append(buffer, INT)
+	buffer = append(buffer, strconv.Itoa(v.num)...)
 	buffer = append(buffer, '\r', '\n')
 	return buffer
 }
@@ -121,6 +132,16 @@ func (r *RespParser) readResp() (Value, error) {
 			typ: "string",
 			str: trimmed,
 		}, nil
+	case INT:
+		val, err := r.readInt()
+		if err != nil {
+			return Value{}, err
+		}
+		return Value{
+			typ: "integer",
+			num: val,
+		}, nil
+
 	case BULK:
 		// read the size of string
 		size, err := r.readInt()

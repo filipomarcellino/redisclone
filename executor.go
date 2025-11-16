@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -21,6 +22,10 @@ func (e *Executor) handleCommand(input Value) Value {
 	switch strings.ToUpper(input.array[0].bulk) {
 	case "PING":
 		return e.handlePingCommand(input.array[1:])
+	case "INCR":
+		return e.handleIncrCommand(input.array[1:])
+	case "DECR":
+		return e.handleDecrCommand(input.array[1:])
 	case "QUIT":
 		os.Exit(1)
 		return Value{}
@@ -33,7 +38,7 @@ func (e *Executor) handleCommand(input Value) Value {
 		// we'll stub this implementation for now by returning an empty array
 		return Value{typ: "array", array: []Value{}}
 	default:
-		return Value{}
+		return Value{typ: "error", bulk: "ERR command not implemented yet"}
 	}
 }
 
@@ -53,11 +58,10 @@ func (e *Executor) handleGetCommand(array []Value) Value {
 	}
 	key := array[0].bulk
 	val, ok := e.db.get(key)
-	valString := val.(string)
 	if !ok {
 		return Value{typ: "null"}
 	}
-	return Value{typ: "bulk", bulk: valString}
+	return Value{typ: "bulk", bulk: val}
 }
 
 func (e *Executor) handlePingCommand(array []Value) Value {
@@ -69,4 +73,34 @@ func (e *Executor) handlePingCommand(array []Value) Value {
 	default:
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'ping' command"}
 	}
+}
+
+func (e *Executor) handleIncrCommand(array []Value) Value {
+	if len(array) != 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'INCR' command"}
+	}
+	// check if value is an int
+	key := array[0].bulk
+	val, _ := e.db.get(key)
+	valInt, err := strconv.Atoi(val)
+	if err != nil {
+		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
+	}
+	e.db.set(key, strconv.Itoa(valInt+1))
+	return Value{typ: "integer", num: valInt + 1}
+}
+
+func (e *Executor) handleDecrCommand(array []Value) Value {
+	if len(array) != 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'DECR' command"}
+	}
+	// check if value is an int
+	key := array[0].bulk
+	val, _ := e.db.get(key)
+	valInt, err := strconv.Atoi(val)
+	if err != nil {
+		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
+	}
+	e.db.set(key, strconv.Itoa(valInt-1))
+	return Value{typ: "integer", num: valInt - 1}
 }

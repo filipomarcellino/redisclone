@@ -44,6 +44,9 @@ func handleConnection(conn net.Conn, kv *KV) {
 		fmt.Printf("request: %+v\n", val)
 		responseVal := executor.handleCommand(val)
 		fmt.Printf("response: %+v\n", responseVal)
+		if responseVal.typ == "quit" {
+			break
+		}
 		respBytes := responseVal.Marshal()
 		_, err = conn.Write(respBytes)
 		if err != nil {

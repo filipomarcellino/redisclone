@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strconv"
 	"strings"
 )
@@ -31,9 +30,6 @@ func (e *Executor) handleCommand(input Value) Value {
 		return e.handleIncrCommand(input.array[1:])
 	case "DECR":
 		return e.handleDecrCommand(input.array[1:])
-	case "QUIT":
-		os.Exit(1)
-		return Value{}
 	case "SET":
 		return e.handleSetCommand(input.array[1:])
 	case "SETNX":
@@ -48,6 +44,8 @@ func (e *Executor) handleCommand(input Value) Value {
 		// redis-cli asks for "COMMAND DOCS" or just "COMMAND" on startup for smart auto-completion
 		// we'll stub this implementation for now by returning an empty array
 		return Value{typ: "array", array: []Value{}}
+	case "QUIT":
+		return Value{typ: "quit"}
 	default:
 		return Value{typ: "error", str: "ERR command not implemented yet"}
 	}
@@ -86,7 +84,7 @@ func (e *Executor) handleMsetCommand(array []Value) Value {
 	}
 	var pairs []KeyValuePair = make([]KeyValuePair, 0, len(array)/2)
 	for i := 0; i < len(array); i += 2 {
-		pairs = append(pairs, KeyValuePair{key: array[i].bulk, value: array[i + 1].bulk})
+		pairs = append(pairs, KeyValuePair{key: array[i].bulk, value: array[i+1].bulk})
 	}
 	e.db.mset(pairs)
 	return Value{typ: "string", str: "OK"}

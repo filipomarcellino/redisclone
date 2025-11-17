@@ -36,6 +36,8 @@ func (e *Executor) handleCommand(input Value) Value {
 		return Value{}
 	case "SET":
 		return e.handleSetCommand(input.array[1:])
+	case "SETNX":
+		return e.handleSetnxCommand(input.array[1:])
 	case "GET":
 		return e.handleGetCommand(input.array[1:])
 	case "MSET":
@@ -59,6 +61,15 @@ func (e *Executor) handleSetCommand(array []Value) Value {
 	val := array[1].bulk
 	e.db.set(key, val)
 	return Value{typ: "string", str: "OK"}
+}
+
+func (e *Executor) handleSetnxCommand(array []Value) Value {
+	if len(array) != 2 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'setnx' command"}
+	}
+	key := array[0].bulk
+	val := array[1].bulk
+	return e.db.setnx(key, val)
 }
 
 func (e *Executor) handleGetCommand(array []Value) Value {

@@ -51,3 +51,15 @@ func (kv *KV) set(key string, val string) {
 	defer kv.lock.Unlock()
 	kv.store[key] = val
 }
+
+func (kv *KV) setnx(key string, val string) Value {
+	kv.lock.Lock()
+	defer kv.lock.Unlock()
+	_, ok := kv.store[key]
+	// early return when data already exists
+	if ok {
+		return Value{typ: "integer", num: 0}
+	}
+	kv.store[key] = val
+	return Value{typ: "integer", num: 1}
+}

@@ -47,7 +47,7 @@ func (e *Executor) handleCommand(input Value) Value {
 		// we'll stub this implementation for now by returning an empty array
 		return Value{typ: "array", array: []Value{}}
 	default:
-		return Value{typ: "error", bulk: "ERR command not implemented yet"}
+		return Value{typ: "error", str: "ERR command not implemented yet"}
 	}
 }
 
@@ -75,7 +75,7 @@ func (e *Executor) handleMsetCommand(array []Value) Value {
 	}
 	var pairs []KeyValuePair = make([]KeyValuePair, 0, len(array)/2)
 	for i := 0; i < len(array); i += 2 {
-		pairs = append(pairs, KeyValuePair{key: array[0].bulk, value: array[1].bulk})
+		pairs = append(pairs, KeyValuePair{key: array[i].bulk, value: array[i + 1].bulk})
 	}
 	e.db.mset(pairs)
 	return Value{typ: "string", str: "OK"}
@@ -128,14 +128,14 @@ func (e *Executor) handleIncrCommand(array []Value) Value {
 
 func (e *Executor) handleDecrCommand(array []Value) Value {
 	if len(array) != 1 {
-		return Value{typ: "error", str: "ERR wrong number of arguments for 'INCR' command"}
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'DECR' command"}
 	}
 	key := array[0].bulk
 	val := e.db.get(key)
 
 	// new key
 	if val.typ == "null" {
-		e.db.set(key, "1")
+		e.db.set(key, "-1")
 		return Value{typ: "integer", num: 1}
 	}
 

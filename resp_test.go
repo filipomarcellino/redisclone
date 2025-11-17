@@ -293,7 +293,7 @@ func TestMarshallError(t *testing.T) {
 		typ: "error",
 		str: "ERR unknown command",
 	}
-	result := pt.marshallError()
+	result := pt.marshalError()
 	expected := []byte("-ERR unknown command\r\n")
 
 	if !bytes.Equal(result, expected) {
@@ -306,7 +306,7 @@ func TestMarshallErrorEmpty(t *testing.T) {
 		typ: "error",
 		str: "",
 	}
-	result := pt.marshallError()
+	result := pt.marshalError()
 	expected := []byte("-\r\n")
 
 	if !bytes.Equal(result, expected) {
@@ -318,7 +318,7 @@ func TestMarshallNull(t *testing.T) {
 	pt := Value{
 		typ: "null",
 	}
-	result := pt.marshallNull()
+	result := pt.marshalNull()
 	expected := []byte("$-1\r\n")
 
 	if !bytes.Equal(result, expected) {

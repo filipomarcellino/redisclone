@@ -22,14 +22,15 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		go handleConnetion(conn, kv)
+		go handleConnection(conn, kv)
 
 	}
 }
 
-func handleConnetion(conn net.Conn, kv *KV) {
+func handleConnection(conn net.Conn, kv *KV) {
 	defer conn.Close()
 	parser := newRespParser(conn)
+	executor := NewExecutor(kv)
 	for {
 		// kilobyte-size buffer to read messages from client
 		val, err := parser.readResp()
@@ -41,7 +42,6 @@ func handleConnetion(conn net.Conn, kv *KV) {
 			break
 		}
 		fmt.Printf("request: %+v\n", val)
-		executor := NewExecutor(kv)
 		responseVal := executor.handleCommand(val)
 		fmt.Printf("response: %+v\n", responseVal)
 		respBytes := responseVal.Marshal()

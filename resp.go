@@ -39,9 +39,9 @@ func (v Value) Marshal() []byte {
 	case "integer":
 		return v.MarshalInt()
 	case "null":
-		return v.marshallNull()
+		return v.marshalNull()
 	case "error":
-		return v.marshallError()
+		return v.marshalError()
 	default:
 		return []byte{}
 	}
@@ -85,7 +85,7 @@ func (v Value) MarshalArray() []byte {
 	}
 	return buffer
 }
-func (v Value) marshallError() []byte {
+func (v Value) marshalError() []byte {
 	var buffer []byte
 	buffer = append(buffer, ERROR)
 	buffer = append(buffer, v.str...)
@@ -94,7 +94,7 @@ func (v Value) marshallError() []byte {
 	return buffer
 }
 
-func (v Value) marshallNull() []byte {
+func (v Value) marshalNull() []byte {
 	return []byte("$-1\r\n")
 }
 

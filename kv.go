@@ -12,8 +12,8 @@ func NewKV() *KV {
 }
 
 func (kv *KV) get(key string) Value {
-	defer kv.lock.RUnlock()
 	kv.lock.RLock()
+	defer kv.lock.RUnlock()
 	val, ok := kv.store[key]
 	if !ok {
 		return Value{typ: "null"}
@@ -22,8 +22,8 @@ func (kv *KV) get(key string) Value {
 }
 
 func (kv *KV) mget(keys []string) Value {
-	defer kv.lock.RUnlock()
 	kv.lock.RLock()
+	defer kv.lock.RUnlock()
 	res := Value{}
 	res.typ = "array"
 	for _, key := range keys {
@@ -39,15 +39,15 @@ func (kv *KV) mget(keys []string) Value {
 
 // atomic multiple set operation
 func (kv *KV) mset(pairs []KeyValuePair) {
-	defer kv.lock.Unlock()
 	kv.lock.Lock()
+	defer kv.lock.Unlock()
 	for _, pair := range pairs {
 		kv.store[pair.key] = pair.value
 	}
 }
 
 func (kv *KV) set(key string, val string) {
-	defer kv.lock.Unlock()
 	kv.lock.Lock()
+	defer kv.lock.Unlock()
 	kv.store[key] = val
 }

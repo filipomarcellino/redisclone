@@ -6,7 +6,8 @@ import (
 )
 
 type Executor struct {
-	db *KV
+	db        []*KV
+	currIndex int
 }
 
 type KeyValuePair struct {
@@ -14,8 +15,8 @@ type KeyValuePair struct {
 	value string
 }
 
-func NewExecutor(db *KV) *Executor {
-	return &Executor{db: db}
+func NewExecutor(kvDatabase []*KV) *Executor {
+	return &Executor{db: kvDatabase, currIndex: 0}
 }
 
 func (e *Executor) handleCommand(input Value) Value {
@@ -40,6 +41,12 @@ func (e *Executor) handleCommand(input Value) Value {
 		return e.handleMsetCommand(input.array[1:])
 	case "MGET":
 		return e.handleMgetCommand(input.array[1:])
+	case "SELECT":
+		return e.handleSelectCommand(input.array[1:])
+	case "FLUSHDB":
+		return e.handleFlushDbCommand(input.array[1:])
+	case "FLUSHALL":
+		return e.handleFlushAllCommand(input.array[1:])
 	case "COMMAND":
 		// redis-cli asks for "COMMAND DOCS" or just "COMMAND" on startup for smart auto-completion
 		// we'll stub this implementation for now by returning an empty array
@@ -57,7 +64,7 @@ func (e *Executor) handleSetCommand(array []Value) Value {
 	}
 	key := array[0].bulk
 	val := array[1].bulk
-	e.db.set(key, val)
+	e.db[e.currIndex].set(key, val)
 	return Value{typ: "string", str: "OK"}
 }
 
@@ -67,7 +74,7 @@ func (e *Executor) handleSetnxCommand(array []Value) Value {
 	}
 	key := array[0].bulk
 	val := array[1].bulk
-	return e.db.setnx(key, val)
+	return e.db[e.currIndex].setnx(key, val)
 }
 
 func (e *Executor) handleGetCommand(array []Value) Value {
@@ -75,7 +82,7 @@ func (e *Executor) handleGetCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'get' command"}
 	}
 	key := array[0].bulk
-	return e.db.get(key)
+	return e.db[e.currIndex].get(key)
 }
 
 func (e *Executor) handleMsetCommand(array []Value) Value {
@@ -86,7 +93,7 @@ func (e *Executor) handleMsetCommand(array []Value) Value {
 	for i := 0; i < len(array); i += 2 {
 		pairs = append(pairs, KeyValuePair{key: array[i].bulk, value: array[i+1].bulk})
 	}
-	e.db.mset(pairs)
+	e.db[e.currIndex].mset(pairs)
 	return Value{typ: "string", str: "OK"}
 }
 
@@ -98,7 +105,7 @@ func (e *Executor) handleMgetCommand(array []Value) Value {
 	for _, value := range array {
 		keys = append(keys, value.bulk)
 	}
-	return e.db.mget(keys)
+	return e.db[e.currIndex].mget(keys)
 }
 
 func (e *Executor) handlePingCommand(array []Value) Value {
@@ -117,11 +124,11 @@ func (e *Executor) handleIncrCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'INCR' command"}
 	}
 	key := array[0].bulk
-	val := e.db.get(key)
+	val := e.db[e.currIndex].get(key)
 
 	// new key
 	if val.typ == "null" {
-		e.db.set(key, "1")
+		e.db[e.currIndex].set(key, "1")
 		return Value{typ: "integer", num: 1}
 	}
 
@@ -131,7 +138,7 @@ func (e *Executor) handleIncrCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
 	}
 
-	e.db.set(key, strconv.Itoa(valInt+1))
+	e.db[e.currIndex].set(key, strconv.Itoa(valInt+1))
 	return Value{typ: "integer", num: valInt + 1}
 }
 
@@ -140,12 +147,12 @@ func (e *Executor) handleDecrCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'DECR' command"}
 	}
 	key := array[0].bulk
-	val := e.db.get(key)
+	val := e.db[e.currIndex].get(key)
 
 	// new key
 	if val.typ == "null" {
-		e.db.set(key, "-1")
-		return Value{typ: "integer", num: 1}
+		e.db[e.currIndex].set(key, "-1")
+		return Value{typ: "integer", num: -1}
 	}
 
 	// check if value is an integer
@@ -154,6 +161,40 @@ func (e *Executor) handleDecrCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
 	}
 
-	e.db.set(key, strconv.Itoa(valInt-1))
+	e.db[e.currIndex].set(key, strconv.Itoa(valInt-1))
 	return Value{typ: "integer", num: valInt - 1}
+}
+
+func (e *Executor) handleSelectCommand(array []Value) Value {
+	if len(array) != 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'SELECT' command"}
+	}
+	ind := array[0].bulk
+	indInt, err := strconv.Atoi(ind)
+	if err != nil {
+		return Value{typ: "error", str: "ERR value is not an integer or out of range"}
+	}
+	if indInt < 0 || indInt > 15 {
+		return Value{typ: "error", str: "ERR DB index is out of range"}
+	}
+	e.currIndex = indInt
+	return Value{typ: "string", str: "OK"}
+}
+
+func (e *Executor) handleFlushDbCommand(array []Value) Value {
+	if len(array) != 0 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'FLUSHDB' command"}
+	}
+	clear(e.db[e.currIndex].store)
+	return Value{typ: "string", str: "OK"}
+}
+
+func (e *Executor) handleFlushAllCommand(array []Value) Value {
+	if len(array) != 0 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'FLUSHALL' command"}
+	}
+	for _, kvInstance := range e.db {
+		clear(kvInstance.store)
+	}
+	return Value{typ: "string", str: "OK"}
 }

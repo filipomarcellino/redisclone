@@ -14,23 +14,26 @@ func main() {
 		return
 	}
 
-	// create unique key value instance
-	kv := NewKV()
+	// create 16 kv instances
+	var kvDatabase []*KV = make([]*KV, 16)
+	for i := range 16 {
+		kvDatabase[i] = NewKV()
+	}
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		go handleConnection(conn, kv)
+		go handleConnection(conn, kvDatabase)
 
 	}
 }
 
-func handleConnection(conn net.Conn, kv *KV) {
+func handleConnection(conn net.Conn, kvDatabase []*KV) {
 	defer conn.Close()
 	parser := newRespParser(conn)
-	executor := NewExecutor(kv)
+	executor := NewExecutor(kvDatabase)
 	for {
 		// kilobyte-size buffer to read messages from client
 		val, err := parser.readResp()

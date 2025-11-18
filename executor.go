@@ -37,6 +37,10 @@ func (e *Executor) handleCommand(input Value) Value {
 		return e.handleSetnxCommand(input.array[1:])
 	case "GET":
 		return e.handleGetCommand(input.array[1:])
+	case "DEL":
+		return e.handleDelCommand(input.array[1:])
+	case "KEYS":
+		return e.handleKeysCommand(input.array[1:])
 	case "MSET":
 		return e.handleMsetCommand(input.array[1:])
 	case "MGET":
@@ -83,6 +87,25 @@ func (e *Executor) handleGetCommand(array []Value) Value {
 	}
 	key := array[0].bulk
 	return e.db[e.currIndex].get(key)
+}
+
+func (e *Executor) handleDelCommand(array []Value) Value {
+	if len(array) < 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'del' command"}
+	}
+	var keys []string = make([]string, 0, len(array))
+	for _, value := range array {
+		keys = append(keys, value.bulk)
+	}
+	return e.db[e.currIndex].del(keys)
+}
+
+func (e *Executor) handleKeysCommand(array []Value) Value {
+	if len(array) != 1 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'keys' command"}
+	}
+	pattern := array[0].bulk
+	return e.db[e.currIndex].keys(pattern)
 }
 
 func (e *Executor) handleMsetCommand(array []Value) Value {

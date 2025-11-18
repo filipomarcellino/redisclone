@@ -1,6 +1,9 @@
 package main
 
-import "sync"
+import (
+	"path"
+	"sync"
+)
 
 type KV struct {
 	store map[string]string
@@ -62,4 +65,58 @@ func (kv *KV) setnx(key string, val string) Value {
 	}
 	kv.store[key] = val
 	return Value{typ: "integer", num: 1}
+}
+
+func (kv *KV) del(keys []string) Value {
+	kv.lock.Lock()
+	defer kv.lock.Unlock()
+	count := 0
+	for _, key := range keys {
+		_, ok := kv.store[key]
+		if ok {
+			delete(kv.store, key)
+			count++
+		}
+	}
+	return Value{typ: "integer", num: count}
+}
+
+func (kv *KV) keys(pattern string) Value {
+	kv.lock.RLock()
+	defer kv.lock.RUnlock()
+	res := Value{}
+	res.typ = "array"
+	res.array = []Value{}
+	for key := range kv.store {
+		matched, err := path.Match(pattern, key)
+		if err != nil {
+			return Value{typ: "error", str: "ERR invalid pattern"}
+		}
+		if matched {
+			res.array = append(res.array, Value{typ: "bulk", bulk: key})
+		}
+	}
+	return res
+}
+
+func (kv *KV) rename(oldKey string, newKey string) Value {
+	kv.lock.Lock()
+	defer kv.lock.Unlock()
+	val, ok := kv.store[oldKey]
+	if !ok {
+		return Value{typ: "error", str: "ERR no such key"}
+	}
+	kv.store[newKey] = val
+	delete(kv.store, oldKey)
+	return Value{typ: "string", str: "OK"}
+}
+
+func (kv *KV) typeOf(key string) Value {
+	kv.lock.RLock()
+	defer kv.lock.RUnlock()
+	_, ok := kv.store[key]
+	if !ok {
+		return Value{typ: "string", str: "none"}
+	}
+	return Value{typ: "string", str: "string"}
 }

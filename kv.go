@@ -110,13 +110,3 @@ func (kv *KV) rename(oldKey string, newKey string) Value {
 	delete(kv.store, oldKey)
 	return Value{typ: "string", str: "OK"}
 }
-
-func (kv *KV) typeOf(key string) Value {
-	kv.lock.RLock()
-	defer kv.lock.RUnlock()
-	_, ok := kv.store[key]
-	if !ok {
-		return Value{typ: "string", str: "none"}
-	}
-	return Value{typ: "string", str: "string"}
-}

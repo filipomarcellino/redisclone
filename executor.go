@@ -41,6 +41,8 @@ func (e *Executor) handleCommand(input Value) Value {
 		return e.handleDelCommand(input.array[1:])
 	case "KEYS":
 		return e.handleKeysCommand(input.array[1:])
+	case "RENAME":
+		return e.handleRenameCommand(input.array[1:])
 	case "MSET":
 		return e.handleMsetCommand(input.array[1:])
 	case "MGET":
@@ -106,6 +108,15 @@ func (e *Executor) handleKeysCommand(array []Value) Value {
 	}
 	pattern := array[0].bulk
 	return e.db[e.currIndex].keys(pattern)
+}
+
+func (e *Executor) handleRenameCommand(array []Value) Value {
+	if len(array) != 2 {
+		return Value{typ: "error", str: "ERR wrong number of arguments for 'rename' command"}
+	}
+	oldKey := array[0].bulk
+	newKey := array[1].bulk
+	return e.db[e.currIndex].rename(oldKey, newKey)
 }
 
 func (e *Executor) handleMsetCommand(array []Value) Value {

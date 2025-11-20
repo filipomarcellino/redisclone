@@ -8,6 +8,7 @@ import (
 type Executor struct {
 	db        []*KV
 	currIndex int
+	// maybe add pointer to AOF struct here
 }
 
 type KeyValuePair struct {

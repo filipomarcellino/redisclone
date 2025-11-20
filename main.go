@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 )
 
 func main() {
@@ -19,6 +20,10 @@ func main() {
 	for i := range 16 {
 		kvDatabase[i] = NewKV()
 	}
+	// todo: search for aof file in the enclosing directory
+	// scanForAof()
+	// todo: load aof file 
+	// loadAOF(file, kvDatabase)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -30,6 +35,23 @@ func main() {
 	}
 }
 
+func loadAOF(file os.File, kvDatabase []*KV) {
+	// aof := newAOF(file)
+	// aofParser := newRespParser(aof.file)
+	executor := NewExecutor(kvDatabase)
+	for {
+		// kilobyte-size buffer to read messages from client
+		val, err := aofParser.readResp()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println("error reading from client: ", err.Error())
+			break
+		}
+		executor.handleCommand(val)
+	}
+}
 func handleConnection(conn net.Conn, kvDatabase []*KV) {
 	defer conn.Close()
 	parser := newRespParser(conn)

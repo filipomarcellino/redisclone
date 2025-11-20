@@ -8,7 +8,7 @@ import (
 type Executor struct {
 	db        []*KV
 	currIndex int
-	// maybe add pointer to AOF struct here
+	aof       *AOF
 }
 
 type KeyValuePair struct {
@@ -16,8 +16,8 @@ type KeyValuePair struct {
 	value string
 }
 
-func NewExecutor(kvDatabase []*KV) *Executor {
-	return &Executor{db: kvDatabase, currIndex: 0}
+func NewExecutor(kvDatabase []*KV, aofPointer *AOF) *Executor {
+	return &Executor{db: kvDatabase, currIndex: 0, aof: aofPointer}
 }
 
 func (e *Executor) handleCommand(input Value) Value {
@@ -65,6 +65,12 @@ func (e *Executor) handleCommand(input Value) Value {
 	}
 }
 
+func (e *Executor) persistToAOF(v Value) {
+	if e.aof != nil {
+		e.aof.append(v)
+	}
+}
+
 func (e *Executor) handleSetCommand(array []Value) Value {
 	if len(array) < 2 {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'set' command"}
@@ -72,7 +78,9 @@ func (e *Executor) handleSetCommand(array []Value) Value {
 	key := array[0].bulk
 	val := array[1].bulk
 	e.db[e.currIndex].set(key, val)
-	return Value{typ: "string", str: "OK"}
+	res := Value{typ: "string", str: "OK"}
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleSetnxCommand(array []Value) Value {
@@ -81,7 +89,9 @@ func (e *Executor) handleSetnxCommand(array []Value) Value {
 	}
 	key := array[0].bulk
 	val := array[1].bulk
-	return e.db[e.currIndex].setnx(key, val)
+	res := e.db[e.currIndex].setnx(key, val)
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleGetCommand(array []Value) Value {
@@ -100,7 +110,9 @@ func (e *Executor) handleDelCommand(array []Value) Value {
 	for _, value := range array {
 		keys = append(keys, value.bulk)
 	}
-	return e.db[e.currIndex].del(keys)
+	res := e.db[e.currIndex].del(keys)
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleKeysCommand(array []Value) Value {
@@ -117,7 +129,9 @@ func (e *Executor) handleRenameCommand(array []Value) Value {
 	}
 	oldKey := array[0].bulk
 	newKey := array[1].bulk
-	return e.db[e.currIndex].rename(oldKey, newKey)
+	res := e.db[e.currIndex].rename(oldKey, newKey)
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleMsetCommand(array []Value) Value {
@@ -129,7 +143,9 @@ func (e *Executor) handleMsetCommand(array []Value) Value {
 		pairs = append(pairs, KeyValuePair{key: array[i].bulk, value: array[i+1].bulk})
 	}
 	e.db[e.currIndex].mset(pairs)
-	return Value{typ: "string", str: "OK"}
+	res := Value{typ: "string", str: "OK"}
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleMgetCommand(array []Value) Value {
@@ -174,7 +190,9 @@ func (e *Executor) handleIncrCommand(array []Value) Value {
 	}
 
 	e.db[e.currIndex].set(key, strconv.Itoa(valInt+1))
-	return Value{typ: "integer", num: valInt + 1}
+	res := Value{typ: "integer", num: valInt + 1}
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleDecrCommand(array []Value) Value {
@@ -197,7 +215,9 @@ func (e *Executor) handleDecrCommand(array []Value) Value {
 	}
 
 	e.db[e.currIndex].set(key, strconv.Itoa(valInt-1))
-	return Value{typ: "integer", num: valInt - 1}
+	res := Value{typ: "integer", num: valInt - 1}
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleSelectCommand(array []Value) Value {
@@ -213,7 +233,9 @@ func (e *Executor) handleSelectCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR DB index is out of range"}
 	}
 	e.currIndex = indInt
-	return Value{typ: "string", str: "OK"}
+	res := Value{typ: "string", str: "OK"}
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleFlushDbCommand(array []Value) Value {
@@ -221,7 +243,9 @@ func (e *Executor) handleFlushDbCommand(array []Value) Value {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'FLUSHDB' command"}
 	}
 	clear(e.db[e.currIndex].store)
-	return Value{typ: "string", str: "OK"}
+	res := Value{typ: "string", str: "OK"}
+	e.persistToAOF(res)
+	return res
 }
 
 func (e *Executor) handleFlushAllCommand(array []Value) Value {
@@ -231,5 +255,7 @@ func (e *Executor) handleFlushAllCommand(array []Value) Value {
 	for _, kvInstance := range e.db {
 		clear(kvInstance.store)
 	}
-	return Value{typ: "string", str: "OK"}
+	res := Value{typ: "string", str: "OK"}
+	e.persistToAOF(res)
+	return res
 }

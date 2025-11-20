@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 )
 
 func main() {
@@ -20,42 +19,49 @@ func main() {
 	for i := range 16 {
 		kvDatabase[i] = NewKV()
 	}
-	// todo: search for aof file in the enclosing directory
-	// scanForAof()
-	// todo: load aof file 
-	// loadAOF(file, kvDatabase)
+
+	// initialize AOF
+	aof, err := newAOF("append-only.aof")
+	if err != nil {
+		fmt.Println("error initializing AOF:", err)
+		return
+	}
+	defer aof.Close()
+
+	// load AOF file if it exists
+	loadAOF(kvDatabase, aof)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		go handleConnection(conn, kvDatabase)
+		go handleConnection(conn, kvDatabase, aof)
 
 	}
 }
 
-func loadAOF(file os.File, kvDatabase []*KV) {
-	// aof := newAOF(file)
-	// aofParser := newRespParser(aof.file)
-	executor := NewExecutor(kvDatabase)
+func loadAOF(kvDatabase []*KV, aof *AOF) {
+	aofParser := newRespParser(aof.file)
+	// pass aof pointer as nil because we don't want to write to aof while reading from it
+	executor := NewExecutor(kvDatabase, nil)
 	for {
-		// kilobyte-size buffer to read messages from client
 		val, err := aofParser.readResp()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			fmt.Println("error reading from client: ", err.Error())
+			fmt.Println("error reading from AOF: ", err.Error())
 			break
 		}
 		executor.handleCommand(val)
 	}
 }
-func handleConnection(conn net.Conn, kvDatabase []*KV) {
+
+func handleConnection(conn net.Conn, kvDatabase []*KV, aof *AOF) {
 	defer conn.Close()
 	parser := newRespParser(conn)
-	executor := NewExecutor(kvDatabase)
+	executor := NewExecutor(kvDatabase, aof)
 	for {
 		// kilobyte-size buffer to read messages from client
 		val, err := parser.readResp()

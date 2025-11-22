@@ -20,23 +20,23 @@ func main() {
 		kvDatabase[i] = NewKV()
 	}
 
-	// initialize AOF
-	aof, err := newAOF("append-only.aof")
-	if err != nil {
-		fmt.Println("error initializing AOF:", err)
-		return
-	}
-	defer aof.Close()
+	// // initialize AOF
+	// aof, err := newAOF("append-only.aof")
+	// if err != nil {
+	// 	fmt.Println("error initializing AOF:", err)
+	// 	return
+	// }
+	// defer aof.Close()
 
-	// load AOF file if it exists
-	loadAOF(kvDatabase, aof)
+	// // load AOF file if it exists
+	// loadAOF(kvDatabase, aof)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		go handleConnection(conn, kvDatabase, aof)
+		go handleConnection(conn, kvDatabase, nil)
 
 	}
 }
@@ -72,9 +72,7 @@ func handleConnection(conn net.Conn, kvDatabase []*KV, aof *AOF) {
 			fmt.Println("error reading from client: ", err.Error())
 			break
 		}
-		fmt.Printf("request: %+v\n", val)
 		responseVal := executor.handleCommand(val)
-		fmt.Printf("response: %+v\n", responseVal)
 		if responseVal.typ == "quit" {
 			break
 		}

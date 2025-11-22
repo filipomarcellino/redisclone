@@ -23,37 +23,77 @@ func NewExecutor(kvDatabase []*KV, aofPointer *AOF) *Executor {
 func (e *Executor) handleCommand(input Value) Value {
 	// always an array type
 	if input.typ != "array" {
-		//todo: return err
+		return Value{typ: "error", str: "ERR expected array type"}
 	}
 	switch strings.ToUpper(input.array[0].bulk) {
 	case "PING":
 		return e.handlePingCommand(input.array[1:])
 	case "INCR":
-		return e.handleIncrCommand(input.array[1:])
+		res := e.handleIncrCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "DECR":
-		return e.handleDecrCommand(input.array[1:])
+		res := e.handleDecrCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "SET":
-		return e.handleSetCommand(input.array[1:])
+		res := e.handleSetCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "SETNX":
-		return e.handleSetnxCommand(input.array[1:])
+		res := e.handleSetnxCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "GET":
 		return e.handleGetCommand(input.array[1:])
 	case "DEL":
-		return e.handleDelCommand(input.array[1:])
+		res := e.handleDelCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "KEYS":
 		return e.handleKeysCommand(input.array[1:])
 	case "RENAME":
-		return e.handleRenameCommand(input.array[1:])
+		res := e.handleRenameCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "MSET":
-		return e.handleMsetCommand(input.array[1:])
+		res := e.handleMsetCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "MGET":
 		return e.handleMgetCommand(input.array[1:])
 	case "SELECT":
-		return e.handleSelectCommand(input.array[1:])
+		res := e.handleSelectCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "FLUSHDB":
-		return e.handleFlushDbCommand(input.array[1:])
+		res := e.handleFlushDbCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "FLUSHALL":
-		return e.handleFlushAllCommand(input.array[1:])
+		res := e.handleFlushAllCommand(input.array[1:])
+		if res.typ != "error" {
+			e.persistToAOF(input)
+		}
+		return res
 	case "COMMAND":
 		// redis-cli asks for "COMMAND DOCS" or just "COMMAND" on startup for smart auto-completion
 		// we'll stub this implementation for now by returning an empty array
@@ -79,7 +119,6 @@ func (e *Executor) handleSetCommand(array []Value) Value {
 	val := array[1].bulk
 	e.db[e.currIndex].set(key, val)
 	res := Value{typ: "string", str: "OK"}
-	e.persistToAOF(res)
 	return res
 }
 
@@ -90,7 +129,6 @@ func (e *Executor) handleSetnxCommand(array []Value) Value {
 	key := array[0].bulk
 	val := array[1].bulk
 	res := e.db[e.currIndex].setnx(key, val)
-	e.persistToAOF(res)
 	return res
 }
 
@@ -111,7 +149,6 @@ func (e *Executor) handleDelCommand(array []Value) Value {
 		keys = append(keys, value.bulk)
 	}
 	res := e.db[e.currIndex].del(keys)
-	e.persistToAOF(res)
 	return res
 }
 
@@ -130,7 +167,6 @@ func (e *Executor) handleRenameCommand(array []Value) Value {
 	oldKey := array[0].bulk
 	newKey := array[1].bulk
 	res := e.db[e.currIndex].rename(oldKey, newKey)
-	e.persistToAOF(res)
 	return res
 }
 
@@ -144,7 +180,6 @@ func (e *Executor) handleMsetCommand(array []Value) Value {
 	}
 	e.db[e.currIndex].mset(pairs)
 	res := Value{typ: "string", str: "OK"}
-	e.persistToAOF(res)
 	return res
 }
 
@@ -191,7 +226,6 @@ func (e *Executor) handleIncrCommand(array []Value) Value {
 
 	e.db[e.currIndex].set(key, strconv.Itoa(valInt+1))
 	res := Value{typ: "integer", num: valInt + 1}
-	e.persistToAOF(res)
 	return res
 }
 
@@ -216,7 +250,6 @@ func (e *Executor) handleDecrCommand(array []Value) Value {
 
 	e.db[e.currIndex].set(key, strconv.Itoa(valInt-1))
 	res := Value{typ: "integer", num: valInt - 1}
-	e.persistToAOF(res)
 	return res
 }
 
@@ -234,7 +267,6 @@ func (e *Executor) handleSelectCommand(array []Value) Value {
 	}
 	e.currIndex = indInt
 	res := Value{typ: "string", str: "OK"}
-	e.persistToAOF(res)
 	return res
 }
 
@@ -244,7 +276,6 @@ func (e *Executor) handleFlushDbCommand(array []Value) Value {
 	}
 	clear(e.db[e.currIndex].store)
 	res := Value{typ: "string", str: "OK"}
-	e.persistToAOF(res)
 	return res
 }
 
@@ -256,6 +287,5 @@ func (e *Executor) handleFlushAllCommand(array []Value) Value {
 		clear(kvInstance.store)
 	}
 	res := Value{typ: "string", str: "OK"}
-	e.persistToAOF(res)
 	return res
 }

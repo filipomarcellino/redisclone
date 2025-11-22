@@ -20,23 +20,23 @@ func main() {
 		kvDatabase[i] = NewKV()
 	}
 
-	// // initialize AOF
-	// aof, err := newAOF("append-only.aof")
-	// if err != nil {
-	// 	fmt.Println("error initializing AOF:", err)
-	// 	return
-	// }
-	// defer aof.Close()
+	// initialize AOF
+	aof, err := newAOF("append-only.aof")
+	if err != nil {
+		fmt.Println("error initializing AOF:", err)
+		return
+	}
+	defer aof.Close()
 
-	// // load AOF file if it exists
-	// loadAOF(kvDatabase, aof)
+	// load AOF file if it exists
+	loadAOF(kvDatabase, aof)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		go handleConnection(conn, kvDatabase, nil)
+		go handleConnection(conn, kvDatabase, aof)
 
 	}
 }

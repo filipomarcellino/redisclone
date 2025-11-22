@@ -7,7 +7,7 @@ import (
 
 type AOF struct {
 	file *os.File
-	lock sync.RWMutex 
+	lock sync.RWMutex
 }
 
 func newAOF(filename string) (*AOF, error) {

@@ -14,11 +14,8 @@ func main() {
 		return
 	}
 
-	// create 16 kv instances
-	var kvDatabase []*KV = make([]*KV, 16)
-	for i := range 16 {
-		kvDatabase[i] = NewKV()
-	}
+	// create a single kv instance
+	kvDatabase := NewKV()
 
 	// initialize AOF
 	aof, err := newAOF("append-only.aof")
@@ -33,15 +30,19 @@ func main() {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println(err)
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				fmt.Printf("accept temp error: %v\n", err)
+				continue
+			}
+
+			fmt.Printf("accept error: %v\n", err)
 			return
 		}
 		go handleConnection(conn, kvDatabase, aof)
-
 	}
 }
 
-func loadAOF(kvDatabase []*KV, aof *AOF) {
+func loadAOF(kvDatabase *KV, aof *AOF) {
 	aofParser := newRespParser(aof.file)
 	// pass aof pointer as nil because we don't want to write to aof while reading from it
 	executor := NewExecutor(kvDatabase, nil)
@@ -58,7 +59,7 @@ func loadAOF(kvDatabase []*KV, aof *AOF) {
 	}
 }
 
-func handleConnection(conn net.Conn, kvDatabase []*KV, aof *AOF) {
+func handleConnection(conn net.Conn, kvDatabase *KV, aof *AOF) {
 	defer conn.Close()
 	parser := newRespParser(conn)
 	executor := NewExecutor(kvDatabase, aof)

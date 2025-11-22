@@ -23,3 +23,12 @@ I am actively working on expanding the capabilities of this project. Here are th
 *   **Redis Streams**: Redis's append-only log
 *   **More Data Structures**: Lists, Sets, Hashes, and Sorted Sets.
 *   **Vector Database**: A stretch goal to explore vector similarity search and embeddings.
+
+## Why did I decide to make this?
+
+* To learn how to build an in-memory cache using multiple threads
+* To learn Go
+* To learn how a job queue is implemented by using append-only logs (redis streams)
+* To learn about sharded locking
+
+In terms of its architecture, this project gets inspiration from [bigcache](https://github.com/allegro/bigcache) which is another multi-threaded go cache with sharded locking.

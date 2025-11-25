@@ -15,8 +15,8 @@ func main() {
 		return
 	}
 
-	// create a single kv instance
-	kvDatabase := NewKV()
+	// create a kv instance with 16 shard counts
+	kvDatabase := NewKV(16)
 
 	// initialize AOF
 	aof, err := newAOF("append-only.aof")

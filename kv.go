@@ -1,23 +1,41 @@
 package main
 
 import (
+	"hash/fnv"
 	"path"
 	"sync"
 )
 
 type KV struct {
-	store map[string]string
-	lock  sync.RWMutex
+	shards     []*Shard
+	shardCount int
 }
 
-func NewKV() *KV {
-	return &KV{store: make(map[string]string)}
+type Shard struct {
+	store map[string]string
+	lock  sync.RWMutex
+	id    int
+}
+
+func NewKV(shardCount int) *KV {
+	shards := make([]*Shard, shardCount)
+	for i := 0; i < shardCount; i++ {
+		shards[i] = &Shard{store: make(map[string]string), id: i}
+	}
+	return &KV{shards: shards, shardCount: shardCount}
+}
+
+func (kv *KV) getShard(key string) *Shard {
+	h := fnv.New32a()
+	h.Write([]byte(key))
+	return kv.shards[int(h.Sum32())%kv.shardCount]
 }
 
 func (kv *KV) get(key string) Value {
-	kv.lock.RLock()
-	defer kv.lock.RUnlock()
-	val, ok := kv.store[key]
+	shard := kv.getShard(key)
+	shard.lock.RLock()
+	defer shard.lock.RUnlock()
+	val, ok := shard.store[key]
 	if !ok {
 		return Value{typ: "null"}
 	}
@@ -25,12 +43,13 @@ func (kv *KV) get(key string) Value {
 }
 
 func (kv *KV) mget(keys []string) Value {
-	kv.lock.RLock()
-	defer kv.lock.RUnlock()
 	res := Value{}
 	res.typ = "array"
 	for _, key := range keys {
-		val, ok := kv.store[key]
+		shard := kv.getShard(key)
+		shard.lock.RLock()
+		val, ok := shard.store[key]
+		shard.lock.RUnlock()
 		if !ok {
 			res.array = append(res.array, Value{typ: "null"})
 			continue
@@ -42,71 +61,133 @@ func (kv *KV) mget(keys []string) Value {
 
 // atomic multiple set operation
 func (kv *KV) mset(pairs []KeyValuePair) {
-	kv.lock.Lock()
-	defer kv.lock.Unlock()
+	// group by shard
+	shardUpdates := make(map[*Shard][]KeyValuePair)
 	for _, pair := range pairs {
-		kv.store[pair.key] = pair.value
+		shard := kv.getShard(pair.key)
+		shardUpdates[shard] = append(shardUpdates[shard], pair)
+	}
+
+	// apply updates per shard
+	for shard, updates := range shardUpdates {
+		shard.lock.Lock()
+		for _, pair := range updates {
+			shard.store[pair.key] = pair.value
+		}
+		shard.lock.Unlock()
 	}
 }
 
 func (kv *KV) set(key string, val string) {
-	kv.lock.Lock()
-	defer kv.lock.Unlock()
-	kv.store[key] = val
+	shard := kv.getShard(key)
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+	shard.store[key] = val
 }
 
 func (kv *KV) setnx(key string, val string) Value {
-	kv.lock.Lock()
-	defer kv.lock.Unlock()
-	_, ok := kv.store[key]
+	shard := kv.getShard(key)
+	shard.lock.Lock()
+	defer shard.lock.Unlock()
+	_, ok := shard.store[key]
 	// early return when data already exists
 	if ok {
 		return Value{typ: "integer", num: 0}
 	}
-	kv.store[key] = val
+	shard.store[key] = val
 	return Value{typ: "integer", num: 1}
 }
 
 func (kv *KV) del(keys []string) Value {
-	kv.lock.Lock()
-	defer kv.lock.Unlock()
-	count := 0
+	// group by shard
+	shardKeys := make(map[*Shard][]string)
 	for _, key := range keys {
-		_, ok := kv.store[key]
-		if ok {
-			delete(kv.store, key)
-			count++
+		shard := kv.getShard(key)
+		shardKeys[shard] = append(shardKeys[shard], key)
+	}
+
+	count := 0
+	// apply deletes per shard
+	for shard, keys := range shardKeys {
+		shard.lock.Lock()
+		for _, key := range keys {
+			_, ok := shard.store[key]
+			if ok {
+				delete(shard.store, key)
+				count++
+			}
 		}
+		shard.lock.Unlock()
 	}
 	return Value{typ: "integer", num: count}
 }
 
 func (kv *KV) keys(pattern string) Value {
-	kv.lock.RLock()
-	defer kv.lock.RUnlock()
 	res := Value{}
 	res.typ = "array"
 	res.array = []Value{}
-	for key := range kv.store {
-		matched, err := path.Match(pattern, key)
-		if err != nil {
-			return Value{typ: "error", str: "ERR invalid pattern"}
+	for _, shard := range kv.shards {
+		shard.lock.RLock()
+		for key := range shard.store {
+			matched, err := path.Match(pattern, key)
+			if err != nil {
+				shard.lock.RUnlock()
+				return Value{typ: "error", str: "ERR invalid pattern"}
+			}
+			if matched {
+				res.array = append(res.array, Value{typ: "bulk", bulk: key})
+			}
 		}
-		if matched {
-			res.array = append(res.array, Value{typ: "bulk", bulk: key})
-		}
+		shard.lock.RUnlock()
 	}
 	return res
 }
 
 func (kv *KV) rename(oldKey string, newKey string) Value {
-	kv.lock.Lock()
-	defer kv.lock.Unlock()
-	val, ok := kv.store[oldKey]
+	oldShard := kv.getShard(oldKey)
+	newShard := kv.getShard(newKey)
+
+	// Same shard optimization
+	if oldShard == newShard {
+		oldShard.lock.Lock()
+		defer oldShard.lock.Unlock()
+		val, ok := oldShard.store[oldKey]
+		if !ok {
+			return Value{typ: "error", str: "ERR no such key"}
+		}
+		oldShard.store[newKey] = val
+		delete(oldShard.store, oldKey)
+		return Value{typ: "string", str: "OK"}
+	}
+
+	// Different shards: lock in order to avoid deadlock
+	firstLock := oldShard
+	secondLock := newShard
+	if oldShard.id > newShard.id {
+		firstLock = newShard
+		secondLock = oldShard
+	}
+
+	firstLock.lock.Lock()
+	defer firstLock.lock.Unlock()
+	secondLock.lock.Lock()
+	defer secondLock.lock.Unlock()
+
+	val, ok := oldShard.store[oldKey]
 	if !ok {
 		return Value{typ: "error", str: "ERR no such key"}
 	}
-	kv.store[newKey] = val
-	delete(kv.store, oldKey)
+
+	newShard.store[newKey] = val
+	delete(oldShard.store, oldKey)
+
 	return Value{typ: "string", str: "OK"}
+}
+
+func (kv *KV) Flush() {
+	for _, shard := range kv.shards {
+		shard.lock.Lock()
+		clear(shard.store)
+		shard.lock.Unlock()
+	}
 }

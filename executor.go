@@ -81,7 +81,6 @@ func (e *Executor) handleCommand(input Value) Value {
 			e.persistToAOF(input)
 		}
 		return res
-		return res
 	case "COMMAND":
 		// redis-cli asks for "COMMAND DOCS" or just "COMMAND" on startup for smart auto-completion
 		// we'll stub this implementation for now by returning an empty array
@@ -245,7 +244,7 @@ func (e *Executor) handleFlushDbCommand(array []Value) Value {
 	if len(array) != 0 {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'FLUSHDB' command"}
 	}
-	clear(e.db.store)
+	e.db.Flush()
 	res := Value{typ: "string", str: "OK"}
 	return res
 }

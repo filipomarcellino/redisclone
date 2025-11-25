@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -63,6 +64,7 @@ func handleConnection(conn net.Conn, kvDatabase *KV, aof *AOF) {
 	defer conn.Close()
 	parser := newRespParser(conn)
 	executor := NewExecutor(kvDatabase, aof)
+	writer := bufio.NewWriter(conn)
 	for {
 		// kilobyte-size buffer to read messages from client
 		val, err := parser.readResp()
@@ -83,5 +85,6 @@ func handleConnection(conn net.Conn, kvDatabase *KV, aof *AOF) {
 			fmt.Println("error writing to client: ", err.Error())
 			break
 		}
+		writer.Flush()
 	}
 }
